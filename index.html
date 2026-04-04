@@ -1440,6 +1440,50 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Best-effort autoplay retries for demo videos.
+  // Browsers may drop autoplay on part of a large video list under resource pressure.
+  const demoVideos = Array.from(document.querySelectorAll('video.poco-managed-video'));
+  const tryAutoplayDemoVideo = (video) => {
+    if (!video) return;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.setAttribute('muted', '');
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {});
+    }
+  };
+
+  demoVideos.forEach((video) => {
+    tryAutoplayDemoVideo(video);
+    ['loadedmetadata', 'canplay', 'mouseenter', 'touchstart'].forEach((eventName) => {
+      video.addEventListener(eventName, () => tryAutoplayDemoVideo(video), { passive: true });
+    });
+  });
+
+  if ('IntersectionObserver' in window) {
+    const demoVideoObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.15) {
+            tryAutoplayDemoVideo(entry.target);
+          }
+        });
+      },
+      {
+        threshold: [0, 0.15, 0.35],
+        rootMargin: '160px 0px'
+      }
+    );
+    demoVideos.forEach((video) => demoVideoObserver.observe(video));
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      demoVideos.forEach(tryAutoplayDemoVideo);
+    }
+  });
+
 });
 </script>
 
